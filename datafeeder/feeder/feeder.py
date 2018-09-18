@@ -1,5 +1,5 @@
 from abc import ABC, abstractclassmethod
-from datafeeder.timer.pulser import Pulser
+from datafeeder.periodic.pulser import Pulser
 import numpy as np
 import pandas as pd
 import time
