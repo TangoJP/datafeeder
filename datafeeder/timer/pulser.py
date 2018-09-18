@@ -49,10 +49,8 @@ class Pulser:
         index as well as whatever the input function returns
 
         INPUTS:
-        *func_args : *args
-            *args for self.func
-        **func_kwargs : **kwargs
-            **kwargs for self.func
+        *func_args & **func_kwargs: *args, **kwargs
+            *args, **kwargs for self.func
         """
         for i in range(self.num_pulses):
             time.sleep(self.wait)
@@ -64,3 +62,5 @@ class Pulser:
         Resets the counter attribute to zero
         """
         self.counter = 0
+
+### END
