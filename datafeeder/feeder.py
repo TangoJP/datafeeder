@@ -1,5 +1,4 @@
 from abc import ABC, abstractclassmethod
-from datafeeder.periodic.pulser import Pulser
 import numpy as np
 import pandas as pd
 import time
@@ -68,6 +67,8 @@ class CSVFeeder(AbstractFeeder):
             raise KeyError('Max index alreay reached.')
 
         # if cols != [], slice the DataFrame
+        if type(cols) != list:
+            raise TypeError('cols must be a list (can be empty or single element list')
         if cols != []:
             data = self.df[cols].iloc[i]
         else:
@@ -92,8 +93,7 @@ class CSVFeeder(AbstractFeeder):
         """
         return self._feed_data(self._retrieve_data(i, cols=cols))
 
-    def feed(self, num_feeds, func, cols=[], wait=0,
-             *func_args, **func_kwargs):
+    def feed(self, num_feeds, cols=[], wait=0, yield_index=False):
         """
         Retrieve & feed multiple times using Pulser object. 'func' that should
         utilize the retrieved data is executed 'num_feeds' times. Time
@@ -103,20 +103,20 @@ class CSVFeeder(AbstractFeeder):
         =======
         num_feeds : int
             Number of times to feed
-        func : callable
-            function to call in the Pulser object
         cols : list
             columns to slice from DF
         wait : non-negative int/float
             time interval between feeds
-        *func_args & **func_kwargs :
-            *args and **kwargs for func
         """
-        pulser = Pulser(num_feeds, self._retrieve_and_feed, wait=wait)
-
-        for i, pulse in pulser.pulse(self.retrieve_next, cols):
-            func(i, pulse, *func_args, **func_kwargs)
+        while self.retrieve_next < num_feeds:
+            time.sleep(wait)
+            data = self._retrieve_and_feed(self.retrieve_next, cols=cols)
+            if yield_index:
+                yield self.retrieve_next, data
+            else:
+                yield data
             self.retrieve_next += 1
+
 
 
 ### END

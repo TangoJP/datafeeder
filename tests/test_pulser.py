@@ -1,6 +1,6 @@
 # The second import fails unless run from the datafeeder (project root) directory
 import time
-from datafeeder.timer.pulser import Pulser
+from datafeeder.to_be_deprecated.pulser import Pulser
 
 # Simple test func
 def myprint1(message):
