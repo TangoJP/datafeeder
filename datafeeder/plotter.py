@@ -4,9 +4,26 @@ import matplotlib.pyplot as plt
 from datafeeder.feeder import CSVFeeder
 
 class Plotter:
-
+    """
+    Class to create a plotter, that plots a point whose data are to be fed by
+    a feeder.
+    """
     @staticmethod
     def create_figure(figsize=(10, 6)):
+        """
+        Just creates a plain fig and ax objects using plt.subplots()
+
+        INPUT:
+        ======
+        figsize : tuple
+            figsize parameter for plt.subplots()
+        
+        OUTPUT:
+        fig :
+            matplotlib figure object
+        ax :
+            matplotlib axis object associated with fig
+        """
         fig, ax = plt.subplots(1, 1, figsize=figsize)
         return fig, ax
 
@@ -33,9 +50,10 @@ class Plotter:
         else:
             self.ax = ax
         
-        self.format_axis(
-            ax=self.ax, title=title, xlabel=xlabel, ylabel=ylabel,
-            grid=grid, xlim=xlim, ylim=ylim, **axis_kwargs)
+        # below to be removed in the new version
+        # self.format_axis(
+        #     ax=self.ax, title=title, xlabel=xlabel, ylabel=ylabel,
+        #     grid=grid, xlim=xlim, ylim=ylim, **axis_kwargs)
 
     def plot_scatter(self, x, y, **scatter_kwargs):
         self.ax.scatter(x, y, **scatter_kwargs)
@@ -69,7 +87,15 @@ class CSVPlotter:
             pause=self.wait, xlim=xlim, ylim=ylim,
             grid=grid, xlabel=xlabel, ylabel=ylabel, title=title
         )
-        
+    
+    def format_plotter(self, title='',xlabel='', ylabel='', grid=True,
+                       xlim=None, ylim=None, **axis_kwargs):
+        # Refactor the Plotter instanciation above, so that formatting of
+        # its axis object can be separately conducted without too much clutter
+        self.plotter.format_axis(ax=self.plotter.ax, 
+            title=title, xlabel=xlabel, ylabel=ylabel,
+            grid=grid, xlim=xlim, ylim=ylim, **axis_kwargs)
+
     def plot(self, **scatter_kwargs):
         for feed in self.csvfeeder.feed(self.num_feeds,
                                         cols=[self.x, self.y],
