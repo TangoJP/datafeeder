@@ -30,6 +30,9 @@ class Plotter:
     @staticmethod
     def format_axis(ax, title='',xlabel='', ylabel='', grid=True,
                     xlim=None, ylim=None, **axis_kwargs):
+        """
+        This function takes in a matplotlib axes.Axes object and formats it.
+        """
         ax.set_title(title)
         ax.set_xlabel(xlabel)
         ax.set_ylabel(ylabel)
@@ -37,28 +40,31 @@ class Plotter:
             ax.set_xlim(xlim)
         if ylim:
             ax.set_ylim(ylim)
-        if grid:
+        if grid and type(grid) == dict:
+            ax.grid(grid)
+        elif grid:
             ax.grid(color='0.7', ls=':')
 
     def __init__(self, ax=None, pause=0,
                  title='',xlabel='', ylabel='', grid=True,
                  xlim=None, ylim=None, **axis_kwargs):
+        """
+        Instantiation sets 'pause' parameter that sets the time interval 
+        between plots. It also creates an axes.Axes object if not specified.
+        """
         self.pause = pause
-
         if ax is None:
             self.fig, self.ax = self.create_figure()
         else:
             self.ax = ax
-        
-        # below to be removed in the new version
-        # self.format_axis(
-        #     ax=self.ax, title=title, xlabel=xlabel, ylabel=ylabel,
-        #     grid=grid, xlim=xlim, ylim=ylim, **axis_kwargs)
 
     def plot_scatter(self, x, y, **scatter_kwargs):
-        self.ax.scatter(x, y, **scatter_kwargs)
+        """
+        scatter plot a single point with a pause
+        """
         plt.pause(self.pause)
-
+        self.ax.scatter(x, y, **scatter_kwargs)
+        
 
 class CSVPlotter:
     
@@ -66,10 +72,46 @@ class CSVPlotter:
                  x=None, y=None, ax=None, 
                  title='',xlabel='', ylabel='', xlim=None, ylim=None,
                  grid=True, **pandas_kwargs):
+        """
+        INPUTS:
+        source : str or DataFrame:
+            path to a .csv file or pandas.DataFrame object
+        num_feeds : int
+            number of feeds to plot
+        wait : positive int or float
+            time interval between data retrieval. Same as interval btw plots
+        x : str
+            column name in the csv file that goes to x-axis
+        y : str
+            column name in the csv file that goes to y-axis
+        ax : matplotlib axis object or None
+            axis object to plot on. If None, it automatically generates a
+            figure and an axis
+        tilte : str
+            title of the plot
+        xlabel : str
+            xlabel
+        ylabel : str
+            yabel
+        xlim : list or None:
+            limits on x-axis
+        ylim : list or None
+            limits on y-axis
+        grid : Boolean or dict
+            parameters for ax.grid()
+        pandas_kwargs : dict
+            kwargs for reading in the csv file
         
-        self.csvfeeder = CSVFeeder(source, **pandas_kwargs)    # Set up a Feeder
-        self.num_feeds = num_feeds
-        self.wait = wait    # Time interval between feeds
+        ATTRIBUTES (*skip noting the obvious ones):
+        ===========
+        self.csvfeeder : CSVFeeder
+            CSVFeeder object used to feed from CSV data read as DataFrame
+        self.plotter : Plotter
+            Plotter object used to plot the fed data.
+        """
+        self.csvfeeder = CSVFeeder(source, **pandas_kwargs) # Set up a Feeder
+        self.num_feeds = num_feeds                          # number of feeds
+        self.wait = wait                                    # Time interval between feeds
 
         # Get data for x and y axes
         if x is None or y is None:
@@ -78,37 +120,37 @@ class CSVPlotter:
             raise TypeError('x and y must be str type.')
         if not (x in self.csvfeeder.df.columns and y in self.csvfeeder.df.columns):
             raise KeyError('x and y must be columns of the DataFrame')
-
         self.x = x
         self.y = y
 
         # Set up a Plotter
-        self.plotter = Plotter(
-            pause=self.wait, xlim=xlim, ylim=ylim,
-            grid=grid, xlabel=xlabel, ylabel=ylabel, title=title
-        )
+        self.plotter = Plotter(ax=None, pause=self.wait)
     
-    def format_plotter(self, title='',xlabel='', ylabel='', grid=True,
-                       xlim=None, ylim=None, **axis_kwargs):
-        # Refactor the Plotter instanciation above, so that formatting of
-        # its axis object can be separately conducted without too much clutter
-        self.plotter.format_axis(ax=self.plotter.ax, 
+    def format_plotter_axis(self, title='',xlabel='', ylabel='', grid=True,
+                            xlim=None, ylim=None, **axis_kwargs):
+        """
+        Format the axis using Plotter().format_axis(). This function was 
+        separated from instantiation and plot(), so that different kinds of
+        kwargs can go in at each point (i.e. kwargs for pandas, axes, and
+        plt.scatter() functions.)
+        """
+        self.plotter.format_axis(
+            ax=self.plotter.ax, 
             title=title, xlabel=xlabel, ylabel=ylabel,
-            grid=grid, xlim=xlim, ylim=ylim, **axis_kwargs)
+            grid=grid, xlim=xlim, ylim=ylim, **axis_kwargs
+        )
 
     def plot(self, **scatter_kwargs):
+        """
+        Use CSVFeeder object as an iterator and Plotter object as the plotter
+        to plot each time point in the data.
+        """
         for feed in self.csvfeeder.feed(self.num_feeds,
                                         cols=[self.x, self.y],
                                         wait=self.wait):
-            #print(feed[0], feed[1])
             self.plotter.plot_scatter(feed[0], feed[1], **scatter_kwargs)
         plt.show()
 
-if __name__ == '__main__':
-    source = './data/EURJPY/EURJPY_2002-201802_day.csv'
-    plotter = CSVPlotter(source, 400, wait=1e-12, x='time', y='close',
-                parse_dates=['time'], dtype={'close':np.float64})
-    scatter_kargs = {'color':'skyblue', 's':10, 'marker':'s'}
-    plotter.plot(**scatter_kargs)
+
 
 ### END
