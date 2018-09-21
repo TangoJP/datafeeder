@@ -3,178 +3,141 @@ import numpy as np
 import pandas as pd
 import time
 
-def read_source(source, **pandas_kwargs):
-    if type(source) == str: # Read file as CSV
-        df = pd.read_csv(source, **pandas_kwargs).reset_index(drop=True)
-    elif type(source) == pd.core.frame.DataFrame:   # Directly assign
-        df = source
-    else:
-        raise TypeError('\'source\' must be DataFrame or String.')
 
-    return df
-
-
-class AbstractFeeder(ABC):
-
-    @abstractclassmethod
-    def _retrieve_data(self):
-        pass
-    
-    @abstractclassmethod
-    def _feed_data(self):
-        pass
-
-    @abstractclassmethod
-    def feed(self):
-        pass
-
-
-class MyFeeder1(AbstractFeeder):
-
-    def __init__(self, source, **pandas_kwargs):
-        self.source = read_source(source, **pandas_kwargs)
-        
-    def _retrieve_data(self):
-            return super()._retrieve_data()
-    
-    def _feed_data(self):
-            return super()._feed_data()
-    
-    def feed(self):
-            return super().feed()
-
-    def __iter__():
-        pass
-    
-
-class CSVFeeder(AbstractFeeder):
-    """
-    Feeder that retrieves data from a CSV file and outputs one row at a time.
-    """
-    def __init__(self, source, **pandas_kwargs):
-        """
-        INPUTS:
-        =======
-        source : str or DataFrame
-            source of the data. If it's str, it reads the file in the path
-            as csv. If it's a DataFrame, it gets taken directly.
-        
-        **pandas_kwargs : **kwargs
-            kwargs for pd.read_cs(source, **pandas_kwargs)
-        
-        ATTRIBUTES:
-        ===========
-        df : DataFrame
-            Imported DataFrame from source
-        retrieve_next : int
-            Index for the next data row to retrieve
-        data_size : int
-            Number of rows in df
-        """
-        self.df = read_source(source, **pandas_kwargs)
-
-        self.retrieve_next = 0
-        self.data_size = len(self.df)
-
-    def _retrieve_data(self, i, cols=[]):
-        """
-        Retrieve the i-th row from self.df.
-
-        INPUTS:
-        =======
-        i : int
-            index of the data row
-        cols : list
-            list of columns to select in a DF
-        """
-        if i >= self.data_size:
-            raise KeyError('Max index alreay reached.')
-
-        # if cols != [], slice the DataFrame
-        if type(cols) != list:
-            raise TypeError('cols must be a list (can be empty or single element list')
-        if cols != []:
-            data = self.df[cols].iloc[i]
+class Source:
+    @staticmethod
+    def read_source2df(source, **pandas_kwargs):
+        if type(source) == str:                         # Read file as CSV
+            df = pd.read_csv(source, **pandas_kwargs).reset_index(drop=True)
+        elif type(source) == pd.core.frame.DataFrame:   # Directly assign DF
+            df = source
         else:
-            data = self.df.iloc[i]
+            raise TypeError('\'source\' must be DataFrame or String.')
 
-        return tuple(data)
+        return df
+
+    def __init__(self, source, name='', cols=[], **pandas_kwargs):
+        self.source = self.read_source2df(source, **pandas_kwargs)
+        self.name = name
+        self.size = len(source)
+        if isinstance(cols, list) and cols != []:
+            self.source = self.source[cols]
+        self.column_names = tuple(self.source.columns)
+
+    def retrieve_row(self, ind, type='iloc'):
+        if type == 'loc':
+            return tuple(self.source.loc[ind])
+        else:
+            return tuple(self.source.iloc[ind])
+
+class Feeder:
+    def __init__(self, source, cols=[], num_feeds=10, retrieve_type='iloc',
+                 print_col_names=False, **pandas_kwargs):
+        """
+        retrieve_type : str
+            By default, it uses iloc[] for slicing, 
+            but if this parameter is set to 'loc', use loc[] 
+        """
+        self.index = 0
+        self.source = Source(source, cols=cols, **pandas_kwargs)
+        self.retrieve_type = retrieve_type
+
+        if num_feeds > self.source.size:
+            raise ValueError('num_feeds must not be bigger than the source size')
+        self.num_feeds = num_feeds
+
+        if print_col_names:
+            print(self.source.column_names)
+
+    def __iter__(self):
+        return self
     
-    def _feed_data(self, data):
-        """
-        Feed data
-        """
+    def __next__(self):
+        if self.index >= self.num_feeds:
+            raise StopIteration()
+        
+        data = self.source.retrieve_row(self.index, type=self.retrieve_type)
+        self.index += 1
         return data
 
-    def _retrieve_and_feed(self, i, cols=[]):
-        """
-        Retrieve data row and feed it.
 
-        INPUTS:
-        =======
-        i : int
-            index of the data row
-        """
-        return self._feed_data(self._retrieve_data(i, cols=cols))
-
-    def feed(self, num_feeds, cols=[], wait=0, yield_index=False):
-        """
-        Retrieve & feed multiple times using Pulser object. 'func' that should
-        utilize the retrieved data is executed 'num_feeds' times. Time
-        interval between feeds can be set with 'wait' parameter.
-
-        INPUTS:
-        =======
-        num_feeds : int
-            Number of times to feed
-        cols : list
-            columns to slice from DF
-        wait : non-negative int/float
-            time interval between feeds
-        """
-        while self.retrieve_next < num_feeds:
-            time.sleep(wait)
-            data = self._retrieve_and_feed(self.retrieve_next, cols=cols)
-            if yield_index:
-                yield self.retrieve_next, data
-            else:
-                yield data
-            self.retrieve_next += 1
-
-
-class MultiFeeder(AbstractFeeder):
+class MultiSouces:
     """
     sources = {name1:path1, name2:path2, ...}
     sources = {name1:df1, name2:df2, ...}
+    cols = [col1, col2, ...]
 
-    cols = {name1:[col1, col2], name2:[col3, col4], ....}
+    *in the future: cols = {name1:[col1, col2], name2:[col3, col4], ....}
+    ** This assumes indices are aligned among different data. Also uses iloc[]
     """
-    def __init__(self, sources, **pandas_kwargs):
+    def __init__(self, sources, cols=[], **pandas_kwargs):
         # Check elements of sources
         if not isinstance(sources, dict):
             raise TypeError('sources must be a dictionary object')
-        if all(isinstance(source, pd.core.frame.DataFrame) for source in sources.values()):
-            self.sources = sources
-        elif all(isinstance(source, str) for source in sources.values()):
-            self.sources = {}
-            for k, v in sources.items():
-                self.sources[k] = pd.read_csv(v, **pandas_kwargs)
-        else:
-            raise TypeError('all values of the sources dictionary must be a str or DataFrame')
+        self.sources = [Source(src, name=name, cols=cols) for name, src in sources.items()]
+        self.sizes = {src.name:src.size for src in self.sources}
+
+    def retrieve_row(self, ind):
+        data = {
+            src.name:src.retrieve_row(ind, type='iloc') for src in self.sources
+        }
+        return data
 
 
+class MultiFeeder:
+    def __init__(self, sources, cols=[], num_feeds=10,
+                 print_col_names=False, **pandas_kwargs):
+        self.index = 0
+        self.sources = MultiSouces(sources, cols=cols, **pandas_kwargs)
 
-        pass
+        if any(num_feeds > size for size in self.sources.sizes.values()):
+            raise ValueError('num_feeds must not be bigger than the source size')
+        self.num_feeds = num_feeds
 
-    def _retrieve_data(self):
-        pass
+        if print_col_names:
+            print(cols)
     
-    def _feed_data(self):
-        pass
+    def __iter__(self):
+        return self
+    
+    def __next__(self):
+        if self.index >= self.num_feeds:
+                raise StopIteration()
+            
+        data = self.sources.retrieve_row(self.index)
+        self.index += 1
+        return data
 
-    def feed(self):
-        pass
+# Use below for quick testing
+if __name__ == '__main__':
+    source1 = [
+        {'time': 0, 'open':100, 'close': 101},
+        {'time': 1, 'open':101, 'close': 105},
+        {'time': 2, 'open':104, 'close': 102},
+        {'time': 3, 'open':103, 'close': 101},
+        {'time': 4, 'open':102, 'close': 107}
+    ]
+    source2 = [
+        {'time': 0, 'open':120, 'close': 121},
+        {'time': 1, 'open':121, 'close': 125},
+        {'time': 2, 'open':124, 'close': 122},
+        {'time': 3, 'open':123, 'close': 121},
+        {'time': 4, 'open':122, 'close': 127}
+    ]
+    source1 = pd.DataFrame(source1)
+    source2 = pd.DataFrame(source2)
 
+    # Test single Feeder
+    print("Testing Single Feeder")
+    myfeeder1 = Feeder(source1, cols=['time', 'close'], num_feeds=5, print_col_names=True)
+    for feed in myfeeder1:
+        print(feed)
 
-
+    # Test MultiFeeder
+    print('\n')
+    print("Testing MuliFeeder")
+    sources = {'src1':source1, 'src2':source2}
+    myfeeder2 = MultiFeeder(sources, cols=['time', 'close'], num_feeds=5)
+    for feed in myfeeder2:
+        print(feed)
 ### END
