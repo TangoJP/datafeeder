@@ -3,6 +3,16 @@ import numpy as np
 import pandas as pd
 import time
 
+def read_source(source, **pandas_kwargs):
+    if type(source) == str: # Read file as CSV
+        df = pd.read_csv(source, **pandas_kwargs).reset_index(drop=True)
+    elif type(source) == pd.core.frame.DataFrame:   # Directly assign
+        df = source
+    else:
+        raise TypeError('\'source\' must be DataFrame or String.')
+
+    return df
+
 
 class AbstractFeeder(ABC):
 
@@ -17,6 +27,25 @@ class AbstractFeeder(ABC):
     @abstractclassmethod
     def feed(self):
         pass
+
+
+class MyFeeder1(AbstractFeeder):
+
+    def __init__(self, source, **pandas_kwargs):
+        self.source = read_source(source, **pandas_kwargs)
+        
+    def _retrieve_data(self):
+            return super()._retrieve_data()
+    
+    def _feed_data(self):
+            return super()._feed_data()
+    
+    def feed(self):
+            return super().feed()
+
+    def __iter__():
+        pass
+    
 
 class CSVFeeder(AbstractFeeder):
     """
@@ -42,12 +71,7 @@ class CSVFeeder(AbstractFeeder):
         data_size : int
             Number of rows in df
         """
-        if type(source) == str: # Read file as CSV
-            self.df = pd.read_csv(source, **pandas_kwargs).reset_index(drop=True)
-        elif type(source) == pd.core.frame.DataFrame:   # Directly assign
-            self.df = source
-        else:
-            raise TypeError('\'source\' must be DataFrame or String.')
+        self.df = read_source(source, **pandas_kwargs)
 
         self.retrieve_next = 0
         self.data_size = len(self.df)
@@ -116,6 +140,40 @@ class CSVFeeder(AbstractFeeder):
             else:
                 yield data
             self.retrieve_next += 1
+
+
+class MultiFeeder(AbstractFeeder):
+    """
+    sources = {name1:path1, name2:path2, ...}
+    sources = {name1:df1, name2:df2, ...}
+
+    cols = {name1:[col1, col2], name2:[col3, col4], ....}
+    """
+    def __init__(self, sources, **pandas_kwargs):
+        # Check elements of sources
+        if not isinstance(sources, dict):
+            raise TypeError('sources must be a dictionary object')
+        if all(isinstance(source, pd.core.frame.DataFrame) for source in sources.values()):
+            self.sources = sources
+        elif all(isinstance(source, str) for source in sources.values()):
+            self.sources = {}
+            for k, v in sources.items():
+                self.sources[k] = pd.read_csv(v, **pandas_kwargs)
+        else:
+            raise TypeError('all values of the sources dictionary must be a str or DataFrame')
+
+
+
+        pass
+
+    def _retrieve_data(self):
+        pass
+    
+    def _feed_data(self):
+        pass
+
+    def feed(self):
+        pass
 
 
 
