@@ -1,7 +1,8 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from datafeeder.feeder import Feeder, MultiFeeder
+from datafeeder.feeder import (
+    SingleRowFeeder, MultiRowFeeder, MultiSourceFeeder)
 
 class Plotter:
     """
@@ -110,7 +111,7 @@ class FeedPlotter:
             Plotter object used to plot the fed data.
         """
         # Set up a Feeder
-        self.feeder = Feeder(source, cols=[x, y], 
+        self.feeder = SingleRowFeeder(source, cols=[x, y], 
                              num_feeds=num_feeds, retrieve_type='iloc', 
                              print_col_names=False, **pandas_kwargs)   
 
