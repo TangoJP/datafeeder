@@ -5,9 +5,16 @@ import time
 
 
 class Source:
+    """
+    Class to hold source data and allows access to the data by a retrieval
+    method.
+    """
     @staticmethod
     def read_source2df(source, **pandas_kwargs):
-        if type(source) == str:                         # Read file as CSV
+        """
+        Function to read in or assigne 'source' into a DataFrame object.
+        """
+        if type(source) == str:     # Read file as CSV
             df = pd.read_csv(source, **pandas_kwargs).reset_index(drop=True)
         elif type(source) == pd.core.frame.DataFrame:   # Directly assign DF
             df = source
@@ -17,26 +24,81 @@ class Source:
         return df
 
     def __init__(self, source, name='', cols=[], **pandas_kwargs):
+        """
+        INPUTS:
+        =======
+        source : str or DataFrame
+            if str, read in the file in the path, if DataFrame, directly
+            assigns it as an attribute
+        name : str
+            name of the source
+        cols : list
+            list of columns to slice in the DataFrame
+        pandas_kwargs: dict
+            **kwargs for pd.read_csv() method
+
+        ATTRIBUTES:
+        ===========
+        column_names : tuple
+            tuple of the included columns
+
+        """
         self.source = self.read_source2df(source, **pandas_kwargs)
         self.name = name
         self.size = len(source)
         if isinstance(cols, list) and cols != []:
             self.source = self.source[cols]
-        self.column_names = tuple(self.source.columns)
+        if cols == []:
+            self.column_names = tuple(self.source.columns)
+        else:
+            self.column_names = tuple(cols)
 
     def retrieve_row(self, ind, type='iloc'):
+        """
+        INPUT:
+        ======
+        ind : int
+            index to retrieve
+        type : 'iloc' or 'loc'
+            typf of index retrieval to use. use iloc by default
+        
+        OUTPUT:
+        =======
+        returns DataFrame.iloc[ind] as tuple
+
+        """
         if type == 'loc':
             return tuple(self.source.loc[ind])
         else:
             return tuple(self.source.iloc[ind])
 
+
 class Feeder:
     def __init__(self, source, cols=[], num_feeds=10, retrieve_type='iloc',
                  print_col_names=False, **pandas_kwargs):
         """
+        INPUT:
+        ======
+        source : str or DataFrame
+            file path for data or DataFrame object
+        cols : list
+            columns to include
+        num_feeds : positive int
+            number of times to feed
         retrieve_type : str
-            By default, it uses iloc[] for slicing, 
-            but if this parameter is set to 'loc', use loc[] 
+            by default, it uses iloc[] for slicing, 
+            but if this parameter is set to 'loc', use loc[]
+        print_col_names : Boolean
+            if True, print the included column names
+        pandas_kwargs : dict
+            **kwargs for pd.read_csv()
+        
+        ATTRIBUTES:
+        ===========
+        index : int
+            index for the iterator
+        source : Source() object
+            Source object read from source input.
         """
         self.index = 0
         self.source = Source(source, cols=cols, **pandas_kwargs)
@@ -53,24 +115,40 @@ class Feeder:
         return self
     
     def __next__(self):
+        # Stop iteration once max reached
         if self.index >= self.num_feeds:
             raise StopIteration()
         
+        # Retrieve data from source and feed
         data = self.source.retrieve_row(self.index, type=self.retrieve_type)
         self.index += 1
         return data
 
 
-class MultiSouces:
+class MultiSource:
     """
-    sources = {name1:path1, name2:path2, ...}
-    sources = {name1:df1, name2:df2, ...}
-    cols = [col1, col2, ...]
-
-    *in the future: cols = {name1:[col1, col2], name2:[col3, col4], ....}
-    ** This assumes indices are aligned among different data. Also uses iloc[]
+    Multi-version of Sources class
     """
     def __init__(self, sources, cols=[], **pandas_kwargs):
+        """
+        Input:
+        ======
+        sources : {name1:path1, name2:path2, ...} or {name1:df1, name2:df2, ...}
+            dictionary whose key is the name of the data and the value the path
+            to the file or DataFrame Object
+        cols : list
+            columns to include
+        
+        ATTRIBUTE:
+        ==========
+        sources : list
+            list containig Source objects for sources input
+        sizes : dictionary
+            dict whose key is data name and the value the size of the data
+
+        *in the future: cols = {name1:[col1, col2], name2:[col3, col4], ....}
+        ** This assumes indices are aligned among different data. Also uses iloc[]
+        """
         # Check elements of sources
         if not isinstance(sources, dict):
             raise TypeError('sources must be a dictionary object')
@@ -78,6 +156,10 @@ class MultiSouces:
         self.sizes = {src.name:src.size for src in self.sources}
 
     def retrieve_row(self, ind):
+        """
+        Multi-version of retrieve_row() method of Source class. Returns
+        {data_name:data_row} dictionary for .iloc[ind] position in each df
+        """
         data = {
             src.name:src.retrieve_row(ind, type='iloc') for src in self.sources
         }
@@ -85,10 +167,32 @@ class MultiSouces:
 
 
 class MultiFeeder:
+    """
+    Multi-version of Feeder
+    """
     def __init__(self, sources, cols=[], num_feeds=10,
                  print_col_names=False, **pandas_kwargs):
+        """
+        INPUT:
+        ======
+        sources : dict
+            sources input for MultiSources object
+        cols : list
+            list of columns to include
+        num_feeds : int
+            number of feeds
+        print_col_names : Boolean
+            print included column names or not
+        pandas_kwargs : dict
+            kwargs for pd.read_csv() function
+
+        ATTRIBUTES:
+        ===========
+        index : int
+            index for the Feeder
+        """
         self.index = 0
-        self.sources = MultiSouces(sources, cols=cols, **pandas_kwargs)
+        self.sources = MultiSource(sources, cols=cols, **pandas_kwargs)
 
         if any(num_feeds > size for size in self.sources.sizes.values()):
             raise ValueError('num_feeds must not be bigger than the source size')
@@ -101,6 +205,10 @@ class MultiFeeder:
         return self
     
     def __next__(self):
+        """
+        next() method. Identical to Feeder class except what's returned is
+        dictionary instead of tuple.
+        """
         if self.index >= self.num_feeds:
                 raise StopIteration()
             
@@ -110,34 +218,6 @@ class MultiFeeder:
 
 # Use below for quick testing
 if __name__ == '__main__':
-    source1 = [
-        {'time': 0, 'open':100, 'close': 101},
-        {'time': 1, 'open':101, 'close': 105},
-        {'time': 2, 'open':104, 'close': 102},
-        {'time': 3, 'open':103, 'close': 101},
-        {'time': 4, 'open':102, 'close': 107}
-    ]
-    source2 = [
-        {'time': 0, 'open':120, 'close': 121},
-        {'time': 1, 'open':121, 'close': 125},
-        {'time': 2, 'open':124, 'close': 122},
-        {'time': 3, 'open':123, 'close': 121},
-        {'time': 4, 'open':122, 'close': 127}
-    ]
-    source1 = pd.DataFrame(source1)
-    source2 = pd.DataFrame(source2)
+    pass
 
-    # Test single Feeder
-    print("Testing Single Feeder")
-    myfeeder1 = Feeder(source1, cols=['time', 'close'], num_feeds=5, print_col_names=True)
-    for feed in myfeeder1:
-        print(feed)
-
-    # Test MultiFeeder
-    print('\n')
-    print("Testing MuliFeeder")
-    sources = {'src1':source1, 'src2':source2}
-    myfeeder2 = MultiFeeder(sources, cols=['time', 'close'], num_feeds=5)
-    for feed in myfeeder2:
-        print(feed)
 ### END
