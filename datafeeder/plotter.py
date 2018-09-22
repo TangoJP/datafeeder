@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from datafeeder.feeder import CSVFeeder
+from datafeeder.feeder import Feeder, MultiFeeder
 
 class Plotter:
     """
@@ -66,10 +66,10 @@ class Plotter:
         self.ax.scatter(x, y, **scatter_kwargs)
         
 
-class CSVPlotter:
+class FeedPlotter:
     
-    def __init__(self, source, num_feeds, wait=1e-12,
-                 x=None, y=None, ax=None, 
+    def __init__(self, source, num_feeds=10, retrieve_type='iloc', 
+                 pause=1e-12, x=None, y=None, ax=None, 
                  title='',xlabel='', ylabel='', xlim=None, ylim=None,
                  grid=True, **pandas_kwargs):
         """
@@ -81,9 +81,9 @@ class CSVPlotter:
         wait : positive int or float
             time interval between data retrieval. Same as interval btw plots
         x : str
-            column name in the csv file that goes to x-axis
+            column name in the csv file / DF that goes to x-axis
         y : str
-            column name in the csv file that goes to y-axis
+            column name in the csv file / DF that goes to y-axis
         ax : matplotlib axis object or None
             axis object to plot on. If None, it automatically generates a
             figure and an axis
@@ -104,27 +104,19 @@ class CSVPlotter:
         
         ATTRIBUTES (*skip noting the obvious ones):
         ===========
-        self.csvfeeder : CSVFeeder
-            CSVFeeder object used to feed from CSV data read as DataFrame
+        self.feeder : Feeder (iterable)
+            Feeder object used to feed from CSV data read as DataFrame
         self.plotter : Plotter
             Plotter object used to plot the fed data.
         """
-        self.csvfeeder = CSVFeeder(source, **pandas_kwargs) # Set up a Feeder
-        self.num_feeds = num_feeds                          # number of feeds
-        self.wait = wait                                    # Time interval between feeds
-
-        # Get data for x and y axes
-        if x is None or y is None:
-            raise ValueError('x and y cannot be None.')
-        if type(x) != str or type(y) != str:
-            raise TypeError('x and y must be str type.')
-        if not (x in self.csvfeeder.df.columns and y in self.csvfeeder.df.columns):
-            raise KeyError('x and y must be columns of the DataFrame')
-        self.x = x
-        self.y = y
+        # Set up a Feeder
+        self.feeder = Feeder(source, cols=[x, y], 
+                             num_feeds=num_feeds, retrieve_type='iloc', 
+                             print_col_names=False, **pandas_kwargs)   
 
         # Set up a Plotter
-        self.plotter = Plotter(ax=None, pause=self.wait)
+        self.pause = pause
+        self.plotter = Plotter(ax=None, pause=self.pause)
     
     def format_plotter_axis(self, title='',xlabel='', ylabel='', grid=True,
                             xlim=None, ylim=None, **axis_kwargs):
@@ -142,15 +134,12 @@ class CSVPlotter:
 
     def plot(self, **scatter_kwargs):
         """
-        Use CSVFeeder object as an iterator and Plotter object as the plotter
+        Use Feeder object as an iterator and Plotter object as the plotter
         to plot each time point in the data.
         """
-        for feed in self.csvfeeder.feed(self.num_feeds,
-                                        cols=[self.x, self.y],
-                                        wait=self.wait):
+        for feed in self.feeder:
             self.plotter.plot_scatter(feed[0], feed[1], **scatter_kwargs)
         plt.show()
-
 
 
 ### END

@@ -45,7 +45,7 @@ class Source:
         """
         self.source = self.read_source2df(source, **pandas_kwargs)
         self.name = name
-        self.size = len(source)
+        self.size = len(self.source)
         if isinstance(cols, list) and cols != []:
             self.source = self.source[cols]
         if cols == []:

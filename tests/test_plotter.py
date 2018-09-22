@@ -1,4 +1,4 @@
-from datafeeder.plotter import Plotter, CSVPlotter
+from datafeeder.plotter import Plotter, FeedPlotter
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -38,14 +38,17 @@ class PlotterTest(unittest.TestCase):
         
         plt.show()
 
-class CSVPlotterTest(unittest.TestCase):
+
+class TestFeedPlotter(unittest.TestCase):
 
     def test_basic_scatter(self):
         # Set up plotter
         source = './data/EURJPY/EURJPY_2002-201802_day.csv'
         num_feeds = 50
-        plotter = CSVPlotter(source, num_feeds, wait=1e-12, x='time', y='close',
-                    parse_dates=['time'], dtype={'close':np.float64})
+        plotter = FeedPlotter(source, num_feeds=num_feeds, pause=1e-12, 
+                              x='time', y='close',
+                              parse_dates=['time'], 
+                              dtype={'close':np.float64})
         
         # Format axis
         plotter.format_plotter_axis(
@@ -61,16 +64,18 @@ class CSVPlotterTest(unittest.TestCase):
 
     def test_counter(self):
         source = './data/EURJPY/EURJPY_2002-201802_day.csv'
-        num_feeds = 100
-        plotter = CSVPlotter(source, num_feeds, wait=1e-12, x='time', y='close',
-                    parse_dates=['time'], dtype={'close':np.float64})
+        num_feeds = 50
+        plotter = FeedPlotter(source, num_feeds=num_feeds, pause=1e-12, 
+                              x='time', y='close',
+                              parse_dates=['time'], 
+                              dtype={'close':np.float64})
 
         # Counter before plot should be set to 0    
-        self.assertEqual(plotter.csvfeeder.retrieve_next, 0)
+        self.assertEqual(plotter.feeder.index, 0)
         plotter.plot()
 
         # Counter after plot should equal num_feeds
-        self.assertEqual(plotter.csvfeeder.retrieve_next, num_feeds)
+        self.assertEqual(plotter.feeder.index, num_feeds)
 
 
 if __name__ == '__main__':
