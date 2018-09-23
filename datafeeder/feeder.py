@@ -5,7 +5,20 @@ import time
 from datafeeder.datasource import SingleSource, MultiSource
 
 
-class SingleRowFeeder:
+class ABCFeeder(ABC):
+    @abstractclassmethod
+    def __init__(self):
+        pass
+    
+    @abstractclassmethod
+    def __iter__(self):
+        pass
+    
+    @abstractclassmethod
+    def __next__(self):
+        pass
+
+class SingleRowFeeder(ABCFeeder):
     def __init__(self, source, cols=[], num_feeds=10, retrieve_type='iloc',
                  print_col_names=False, **pandas_kwargs):
         """
@@ -78,7 +91,7 @@ class MultiRowFeeder(SingleRowFeeder):
         return data
 
 
-class MultiSourceFeeder:
+class MultiSourceFeeder(ABCFeeder):
     """
     Multi-version of Feeder
     """
